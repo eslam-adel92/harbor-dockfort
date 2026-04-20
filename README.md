@@ -1,7 +1,7 @@
 # Harbor Registry — Production Setup Guide
 
 > **Target:** Hetzner Cloud CX22 (2 vCPU, 4GB RAM, SSD)
-> **Harbor Version:** v2.12.0 (⚠️ EOL 2026-03-20 — upgrade to v2.14.x+ recommended)
+> **Harbor Version:** v2.14.0
 > **Reverse Proxy:** Traefik + ModSecurity WAF (existing `traefik_waf_modsec_nginx` stack)
 
 ---
@@ -244,7 +244,7 @@ configuration files.
 cd /opt/harbor-registry
 
 # Download Harbor offline installer
-HARBOR_VERSION="v2.12.0"
+HARBOR_VERSION="v2.14.0"
 curl -sL "https://github.com/goharbor/harbor/releases/download/${HARBOR_VERSION}/harbor-offline-installer-${HARBOR_VERSION}.tgz" \
   -o harbor-installer.tgz
 
@@ -450,7 +450,7 @@ docker rmi registry.yourdomain.com/library/alpine:test
 
 | Upgrade Type | Example           | Risk   | Procedure                       |
 | :----------- | :---------------- | :----- | :------------------------------ |
-| **Patch**    | v2.12.0 → v2.12.1 | Low    | Direct image tag update         |
+| **Patch**    | v2.14.0 → v2.12.1 | Low    | Direct image tag update         |
 | **Minor**    | v2.12.x → v2.13.x | Medium | Auto-migration on first start   |
 | **Major**    | v2.x → v3.x       | High   | Requires migration guide review |
 
@@ -479,8 +479,8 @@ curl -sk https://registry.yourdomain.com/api/v2.0/health | jq .
 cd /opt/harbor-registry
 
 # 1. Update image tags in docker-compose.yml
-# Example: Change all v2.12.0 → v2.12.4
-sed -i 's/v2.12.0/v2.12.4/g' docker-compose.yml
+# Example: Change all v2.14.0 → v2.12.4
+sed -i 's/v2.14.0/v2.12.4/g' docker-compose.yml
 
 # 2. Pull new images
 docker compose pull
@@ -553,12 +553,12 @@ docker compose up -d
 curl -sk https://registry.yourdomain.com/api/v2.0/health | jq .
 ```
 
-### 7.6 Recommended Upgrade Path (from v2.12.0)
+### 7.6 Recommended Upgrade Path (from v2.14.0)
 
 Since Harbor v2.12.x reached EOL on 2026-03-20, plan an upgrade:
 
 ```
-v2.12.0 → v2.12.4 (latest patch, safe) → v2.13.5 → v2.14.3 → v2.15.0
+v2.14.0 → v2.12.4 (latest patch, safe) → v2.13.5 → v2.14.3 → v2.15.0
 ```
 
 > **Important:** Do NOT skip minor versions. Each minor version may include

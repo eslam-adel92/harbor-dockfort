@@ -2,7 +2,7 @@
 # Harbor Container Registry — Production Docker Compose
 # =============================================================================
 # Target: Hetzner Cloud CX22 (2 vCPU, 4 GB RAM, SSD)
-# Harbor Version: v2.12.0
+# Harbor Version: v2.14.0
 # Companion to: eslam-adel92/traefik_waf_modsec_nginx
 #
 # HOW THIS WORKS:
@@ -72,7 +72,7 @@ services:
   # harbor-log  (internal syslog collector — no Traefik exposure)
   # -------------------------------------------------------------------------
   harbor-log:
-    image: goharbor/harbor-log:v2.12.0
+    image: goharbor/harbor-log:v2.14.0
     container_name: harbor-log
     restart: always
     networks:
@@ -98,7 +98,7 @@ services:
   # Reduced max_connections to 50 to stay within 4 GB RAM budget.
   # -------------------------------------------------------------------------
   harbor-db:
-    image: goharbor/harbor-db:v2.12.0
+    image: goharbor/harbor-db:v2.14.0
     container_name: harbor-db
     restart: always
     networks:
@@ -133,7 +133,7 @@ services:
   # Persistence is handled by harbor-db. This prevents unexpected I/O spikes.
   # -------------------------------------------------------------------------
   harbor-redis:
-    image: goharbor/redis-photon:v2.12.0
+    image: goharbor/redis-photon:v2.14.0
     container_name: harbor-redis
     restart: always
     networks:
@@ -166,7 +166,7 @@ services:
   # Gets the most CPU/RAM — all layer blob streaming passes through here.
   # -------------------------------------------------------------------------
   harbor-registry:
-    image: goharbor/registry-photon:v2.12.0
+    image: goharbor/registry-photon:v2.14.0
     container_name: harbor-registry
     restart: always
     networks:
@@ -193,7 +193,7 @@ services:
   # harbor-registryctl  (registry garbage-collection controller)
   # -------------------------------------------------------------------------
   harbor-registryctl:
-    image: goharbor/harbor-registryctl:v2.12.0
+    image: goharbor/harbor-registryctl:v2.14.0
     container_name: harbor-registryctl
     restart: always
     networks:
@@ -222,7 +222,7 @@ services:
   # GC_SCHEDULE triggers Harbor's native garbage collection nightly at 03:00.
   # -------------------------------------------------------------------------
   harbor-core:
-    image: goharbor/harbor-core:v2.12.0
+    image: goharbor/harbor-core:v2.14.0
     container_name: harbor-core
     restart: always
     networks:
@@ -318,7 +318,7 @@ services:
   # harbor-portal  (Nginx serving the Vue.js UI — public-facing)
   # -------------------------------------------------------------------------
   harbor-portal:
-    image: goharbor/harbor-portal:v2.12.0
+    image: goharbor/harbor-portal:v2.14.0
     container_name: harbor-portal
     restart: always
     networks:
@@ -362,7 +362,7 @@ services:
   # harbor-jobservice  (async replication, GC, scan jobs)
   # -------------------------------------------------------------------------
   harbor-jobservice:
-    image: goharbor/harbor-jobservice:v2.12.0
+    image: goharbor/harbor-jobservice:v2.14.0
     container_name: harbor-jobservice
     restart: always
     networks:
@@ -389,7 +389,7 @@ services:
   # First start downloads the Trivy DB (~200 MB). Subsequent starts are fast.
   # -------------------------------------------------------------------------
   trivy-adapter:
-    image: goharbor/trivy-adapter-photon:v2.12.0
+    image: goharbor/trivy-adapter-photon:v2.14.0
     container_name: trivy-adapter
     restart: always
     networks:
@@ -427,7 +427,7 @@ services:
   # Scrape at /metrics on port 9090 (internal). Wire to your monitoring stack.
   # -------------------------------------------------------------------------
   harbor-exporter:
-    image: goharbor/harbor-exporter:v2.12.0
+    image: goharbor/harbor-exporter:v2.14.0
     container_name: harbor-exporter
     restart: always
     networks:
