@@ -1,0 +1,13 @@
+# Environment secrets
+.env
+
+# Harbor generated configs (from install script)
+config/
+
+# Backup artifacts
+*.sql.gz
+*.tar.gz
+
+# OS artifacts
+.DS_Store
+Thumbs.db

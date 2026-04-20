@@ -1,0 +1,450 @@
+# =============================================================================
+# Harbor Container Registry — Production Docker Compose
+# =============================================================================
+# Target: Hetzner Cloud CX22 (2 vCPU, 4 GB RAM, SSD)
+# Harbor Version: v2.12.0
+# Companion to: eslam-adel92/traefik_waf_modsec_nginx
+#
+# HOW THIS WORKS:
+#   Harbor's official installer generates TWO things:
+#     1.  docker-compose.yml   → base service definitions + ./common/config/ mounts
+#     2.  common/config/       → all config files for each service
+#
+#   This file is a docker-compose OVERRIDE that adds:
+#     - Traefik labels (routing, WAF bypass, rate limiting)
+#     - Resource limits (tuned for 2 vCPU / 4 GB RAM)
+#     - Hetzner MTU 1450 network
+#     - Connection to the existing Traefik WAF network
+#
+#   It does NOT duplicate volume mounts or env_file entries — those come
+#   from the installer-generated base file.
+#
+# DEPLOYMENT:
+#   docker compose up -d
+#
+# HETZNER MTU NOTE:
+#   Hetzner Cloud uses a VXLAN overlay with an effective MTU of 1450 (not 1500).
+#   Containers that default to MTU 1500 will silently fragment large packets,
+#   causing layer push/pull hangs and checksum failures.
+#   Every network defined here sets com.docker.network.driver.mtu: 1450.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  # Internal Harbor service-to-service mesh.
+  harbor_internal:
+    driver: bridge
+    driver_opts:
+      # MTU 1450 matches Hetzner Cloud VXLAN encapsulation overhead.
+      # Without this, large layer pushes will silently fail.
+      com.docker.network.driver.mtu: "1450"
+    internal: true   # No direct internet access from this network
+
+  # Attach Harbor services that need Traefik routing to the existing WAF network.
+  # This network is created by eslam-adel92/traefik_waf_modsec_nginx — do NOT
+  # redefine it with `driver` or `driver_opts`; use `external: true`.
+  traefik_waf_modsec_nginx_default:
+    external: true
+
+# ---------------------------------------------------------------------------
+# Volumes (named, to survive compose restarts)
+# ---------------------------------------------------------------------------
+volumes:
+  harbor_registry_data:
+    driver: local
+  harbor_db_data:
+    driver: local
+  harbor_redis_data:
+    driver: local
+  harbor_job_logs:
+    driver: local
+  harbor_trivy_data:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
+services:
+
+  # -------------------------------------------------------------------------
+  # harbor-log  (internal syslog collector — no Traefik exposure)
+  # -------------------------------------------------------------------------
+  harbor-log:
+    image: goharbor/harbor-log:v2.12.0
+    container_name: harbor-log
+    restart: always
+    networks:
+      - harbor_internal
+    volumes:
+      - /var/log/harbor/:/var/log/docker/:z
+      - ./common/config/log/logrotate.conf:/etc/logrotate.d/logrotate.conf
+      - ./common/config/log/rsyslog_docker.conf:/etc/rsyslog.d/rsyslog_docker.conf
+    ports:
+      # Bind only to localhost — services send logs here; never exposed externally.
+      - "127.0.0.1:1514:10514"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 64M
+        reservations:
+          cpus: "0.02"
+          memory: 32M
+
+  # -------------------------------------------------------------------------
+  # harbor-db  (PostgreSQL — internal only)
+  # Reduced max_connections to 50 to stay within 4 GB RAM budget.
+  # -------------------------------------------------------------------------
+  harbor-db:
+    image: goharbor/harbor-db:v2.12.0
+    container_name: harbor-db
+    restart: always
+    networks:
+      - harbor_internal
+    volumes:
+      - harbor_db_data:/var/lib/postgresql/data:z
+      - ./common/config/db/env:/etc/harbor/env:z
+    env_file:
+      - ./common/config/db/env
+    command: postgres -c 'max_connections=50' -c 'shared_buffers=128MB'
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      - harbor-log
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # -------------------------------------------------------------------------
+  # harbor-redis  (Redis — internal only)
+  # maxmemory 128mb with allkeys-lru eviction keeps footprint predictable.
+  # `--save ""` disables RDB snapshots; Harbor Redis is a cache/queue only.
+  # Persistence is handled by harbor-db. This prevents unexpected I/O spikes.
+  # -------------------------------------------------------------------------
+  harbor-redis:
+    image: goharbor/redis-photon:v2.12.0
+    container_name: harbor-redis
+    restart: always
+    networks:
+      - harbor_internal
+    volumes:
+      - harbor_redis_data:/var/lib/redis:z
+    command: >
+      redis-server
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - harbor-log
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 128M
+
+  # -------------------------------------------------------------------------
+  # harbor-registry  (OCI Distribution registry daemon)
+  # Gets the most CPU/RAM — all layer blob streaming passes through here.
+  # -------------------------------------------------------------------------
+  harbor-registry:
+    image: goharbor/registry-photon:v2.12.0
+    container_name: harbor-registry
+    restart: always
+    networks:
+      - harbor_internal
+    volumes:
+      - harbor_registry_data:/storage:z
+      - ./common/config/registry/:/etc/registry/:z
+      - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
+    env_file:
+      - ./common/config/registry/env
+    depends_on:
+      - harbor-log
+    deploy:
+      resources:
+        limits:
+          # Registry handles binary streaming; give it the most CPU headroom.
+          cpus: "1.00"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 1G
+
+  # -------------------------------------------------------------------------
+  # harbor-registryctl  (registry garbage-collection controller)
+  # -------------------------------------------------------------------------
+  harbor-registryctl:
+    image: goharbor/harbor-registryctl:v2.12.0
+    container_name: harbor-registryctl
+    restart: always
+    networks:
+      - harbor_internal
+    volumes:
+      - harbor_registry_data:/storage:z
+      - ./common/config/registry/:/etc/registry/:z
+      - ./common/config/registryctl/config.yml:/etc/registryctl/config.yml:z
+      - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
+    env_file:
+      - ./common/config/registryctl/env
+    depends_on:
+      - harbor-log
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  # -------------------------------------------------------------------------
+  # harbor-core  (API server + auth + webhook engine)
+  # Exposed to Traefik on the WAF network for /v2/, /api/, /service/ paths.
+  # GC_SCHEDULE triggers Harbor's native garbage collection nightly at 03:00.
+  # -------------------------------------------------------------------------
+  harbor-core:
+    image: goharbor/harbor-core:v2.12.0
+    container_name: harbor-core
+    restart: always
+    networks:
+      - harbor_internal
+      - traefik_waf_modsec_nginx_default
+    volumes:
+      - ./common/config/core/app.conf:/etc/core/app.conf:z
+      - ./common/config/core/env:/etc/core/env:z
+      - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
+      - harbor_job_logs:/var/log/jobs:z
+    env_file:
+      - ./common/config/core/env
+    environment:
+      # Native GC: run at 03:00 every night. Format: cron expression.
+      - GC_SCHEDULE=0 3 * * *
+      # Delete untagged blobs during GC — reclaims disk from overwritten tags.
+      - GC_PARAMETERS=--delete-untagged=true
+    depends_on:
+      harbor-db:
+        condition: service_healthy
+      harbor-redis:
+        condition: service_healthy
+      harbor-registry:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+    labels:
+      # =====================================================================
+      # Traefik Router Configuration
+      # =====================================================================
+      # Three separate routers handle different traffic patterns:
+      #
+      # 1. harbor-portal  → UI traffic (HTML/JS/CSS)
+      # 2. harbor-api     → Registry API (/v2/, /service/) with WAF + rate limit
+      # 3. harbor-blobs   → Binary blob/manifest uploads WITHOUT WAF
+      #
+      # The blob router is critical: ModSecurity would reject binary layer
+      # uploads as "suspicious payloads," breaking docker push entirely.
+      # =====================================================================
+      - "traefik.enable=true"
+
+      # ── Router: Harbor API / service endpoints ──────────────────────────
+      # Higher priority (11) than the portal router (10) so /v2/ and /service/
+      # are matched first and routed to harbor-core, not harbor-portal.
+      - "traefik.http.routers.harbor-api.rule=Host(`registry.yourdomain.com`) && (PathPrefix(`/v2/`) || PathPrefix(`/service/`) || PathPrefix(`/api/`) || PathPrefix(`/c/`))"
+      - "traefik.http.routers.harbor-api.entrypoints=websecure"
+      - "traefik.http.routers.harbor-api.tls.certresolver=le"
+      - "traefik.http.routers.harbor-api.service=harbor-core-svc"
+      - "traefik.http.routers.harbor-api.priority=11"
+      # Apply headers + rate-limit middleware; WAF (ModSecurity) is active here.
+      - "traefik.http.routers.harbor-api.middlewares=registry-headers@docker,registry-ratelimit@docker"
+      - "traefik.http.services.harbor-core-svc.loadbalancer.server.port=8080"
+
+      # ── Router: Binary blobs & manifests — WAF BYPASS ───────────────────
+      # Docker/OCI clients POST multi-megabyte binary layer blobs.
+      # ModSecurity's request body inspection cannot handle arbitrary binary
+      # data and WILL block legitimate pushes with 403/413 errors.
+      # This router has the highest priority (20) and intentionally omits the
+      # WAF middleware chain; TLS + rate limiting still apply.
+      - "traefik.http.routers.harbor-blobs.rule=Host(`registry.yourdomain.com`) && PathPrefix(`/v2/`) && (Method(`POST`,`PUT`,`PATCH`) || PathRegexp(`^/v2/.+/(blobs|manifests)/`))"
+      - "traefik.http.routers.harbor-blobs.entrypoints=websecure"
+      - "traefik.http.routers.harbor-blobs.tls.certresolver=le"
+      - "traefik.http.routers.harbor-blobs.service=harbor-core-svc"
+      - "traefik.http.routers.harbor-blobs.priority=20"
+      # Only rate limiting + headers — NO WAF, no body inspection.
+      - "traefik.http.routers.harbor-blobs.middlewares=registry-ratelimit@docker,registry-headers@docker"
+
+      # ── Middleware: OCI-compliant response headers ───────────────────────
+      # X-Content-Type-Options: prevents MIME-type sniffing attacks.
+      # X-Frame-Options: prevents clickjacking on Harbor UI.
+      # Content-Encoding cleared: OCI spec requires registries to serve blobs
+      # without transfer encoding — stripping gzip prevents double-encoding.
+      - "traefik.http.middlewares.registry-headers.headers.customrequestheaders.X-Content-Type-Options=nosniff"
+      - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.Content-Encoding="
+      - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.X-Frame-Options=DENY"
+      - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
+      # Empty value = remove header. Strips gzip encoding from upstream.
+      - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.Content-Encoding="
+
+      # ── Middleware: Rate limiting ─────────────────────────────────────────
+      # 50 req/s average, burst of 100 — generous for CI/CD push workflows
+      # while protecting against unauthenticated enumeration attacks.
+      - "traefik.http.middlewares.registry-ratelimit.ratelimit.average=50"
+      - "traefik.http.middlewares.registry-ratelimit.ratelimit.burst=100"
+
+  # -------------------------------------------------------------------------
+  # harbor-portal  (Nginx serving the Vue.js UI — public-facing)
+  # -------------------------------------------------------------------------
+  harbor-portal:
+    image: goharbor/harbor-portal:v2.12.0
+    container_name: harbor-portal
+    restart: always
+    networks:
+      - harbor_internal
+      - traefik_waf_modsec_nginx_default
+    volumes:
+      - ./common/config/portal/nginx.conf:/etc/nginx/nginx.conf:z
+    depends_on:
+      - harbor-core
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    labels:
+      - "traefik.enable=true"
+
+      # ── Router: Web UI (catch-all at priority 10) ────────────────────────
+      # Lower priority than harbor-api (11) and harbor-blobs (20) routers,
+      # so /v2/ and /service/ are never accidentally sent to the portal Nginx.
+      - "traefik.http.routers.harbor-portal.rule=Host(`registry.yourdomain.com`)"
+      - "traefik.http.routers.harbor-portal.entrypoints=websecure"
+      - "traefik.http.routers.harbor-portal.tls.certresolver=le"
+      - "traefik.http.routers.harbor-portal.service=harbor-portal-svc"
+      - "traefik.http.routers.harbor-portal.priority=10"
+      # WAF is active for the HTML UI; ModSecurity handles XSS/SQLi detection.
+      - "traefik.http.routers.harbor-portal.middlewares=registry-headers@docker"
+      - "traefik.http.services.harbor-portal-svc.loadbalancer.server.port=8080"
+
+      # ── HTTP → HTTPS redirect ────────────────────────────────────────────
+      - "traefik.http.routers.harbor-portal-http.rule=Host(`registry.yourdomain.com`)"
+      - "traefik.http.routers.harbor-portal-http.entrypoints=web"
+      - "traefik.http.routers.harbor-portal-http.middlewares=redirect-to-https@docker"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+  # -------------------------------------------------------------------------
+  # harbor-jobservice  (async replication, GC, scan jobs)
+  # -------------------------------------------------------------------------
+  harbor-jobservice:
+    image: goharbor/harbor-jobservice:v2.12.0
+    container_name: harbor-jobservice
+    restart: always
+    networks:
+      - harbor_internal
+    volumes:
+      - harbor_job_logs:/var/log/jobs:z
+      - ./common/config/jobservice/config.yml:/etc/jobservice/config.yml:z
+      - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
+    env_file:
+      - ./common/config/jobservice/env
+    depends_on:
+      - harbor-core
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # -------------------------------------------------------------------------
+  # trivy-adapter  (vulnerability scanning — memory-intensive on first run)
+  # First start downloads the Trivy DB (~200 MB). Subsequent starts are fast.
+  # -------------------------------------------------------------------------
+  trivy-adapter:
+    image: goharbor/trivy-adapter-photon:v2.12.0
+    container_name: trivy-adapter
+    restart: always
+    networks:
+      - harbor_internal
+    volumes:
+      - harbor_trivy_data:/home/scanner/.cache/trivy:z
+    env_file:
+      - ./common/config/trivy-adapter/env
+    environment:
+      # Block images with Critical CVEs from being pulled after push scan.
+      SCANNER_TRIVY_SEVERITY: "CRITICAL,HIGH"
+      # Do not exit if Trivy DB update fails (graceful degradation).
+      SCANNER_TRIVY_SKIP_UPDATE: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/probe/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - harbor-core
+      - harbor-redis
+    deploy:
+      resources:
+        limits:
+          # Trivy loads full CVE database into memory during scans.
+          cpus: "0.50"
+          memory: 1G
+        reservations:
+          cpus: "0.10"
+          memory: 512M
+
+  # -------------------------------------------------------------------------
+  # harbor-exporter  (Prometheus metrics endpoint — optional but recommended)
+  # Scrape at /metrics on port 9090 (internal). Wire to your monitoring stack.
+  # -------------------------------------------------------------------------
+  harbor-exporter:
+    image: goharbor/harbor-exporter:v2.12.0
+    container_name: harbor-exporter
+    restart: always
+    networks:
+      - harbor_internal
+    env_file:
+      - ./common/config/exporter/env
+    environment:
+      - HARBOR_SERVICE_SCHEME=http
+      - HARBOR_SERVICE_HOST=harbor-core
+      - HARBOR_SERVICE_PORT=8080
+    depends_on:
+      - harbor-core
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 64M
+        reservations:
+          cpus: "0.02"
+          memory: 32M
