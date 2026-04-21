@@ -428,8 +428,6 @@ services:
     restart: always
     networks:
       - harbor_internal
-    env_file:
-      - ./common/config/exporter/env
     environment:
       - HARBOR_SERVICE_SCHEME=http
       - HARBOR_SERVICE_HOST=harbor-core
