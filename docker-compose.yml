@@ -185,7 +185,7 @@ services:
     volumes:
       - harbor_registry_data:/storage
       - ./common/config/registry/:/etc/registry/:z
-      - ./harbor-data/secret/registry/root.crt:/etc/registry/root.crt:z
+      # - /mnt/harbor-storage/harbor-data/secret/registry/root.crt:/etc/registry/root.crt:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
     depends_on:
       - harbor-log
@@ -245,10 +245,10 @@ services:
     volumes:
       - ./common/config/core/app.conf:/etc/core/app.conf:z
       - ./common/config/core/env:/etc/core/env:z
-      - ./harbor-data/secret/core/private_key.pem:/etc/core/private_key.pem:z
-      - ./harbor-data/secret/keys/secretkey:/etc/core/key:z
-      - ./harbor-data/ca_download/:/etc/core/ca/:z
-      # - ./harbor-data/:/data/:z
+      # - /mnt/harbor-storage/harbor-data/secret/core/private_key.pem:/etc/core/private_key.pem:z
+      # - /mnt/harbor-storage/harbor-data/secret/keys/secretkey:/etc/core/key:z
+      # - /mnt/harbor-storage/harbor-data/ca_download/:/etc/core/ca/:z
+      # - /mnt/harbor-storage/harbor-data/:/data/:z
       - ./common/config/core/certificates/:/etc/core/certificates/:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
       - harbor_job_logs:/var/log/jobs
