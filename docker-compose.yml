@@ -244,6 +244,8 @@ services:
     volumes:
       - ./common/config/core/app.conf:/etc/core/app.conf:z
       - ./common/config/core/env:/etc/core/env:z
+      - ./common/config/core/private_key.pem:/etc/core/private_key.pem:z
+      - ./common/config/core/certificates/:/etc/core/certificates/:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
       - harbor_job_logs:/var/log/jobs
     env_file:
