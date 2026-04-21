@@ -175,8 +175,6 @@ services:
       - harbor_registry_data:/storage:z
       - ./common/config/registry/:/etc/registry/:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
-    env_file:
-      - ./common/config/registry/env
     depends_on:
       - harbor-log
     deploy:
