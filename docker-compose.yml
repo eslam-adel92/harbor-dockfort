@@ -108,7 +108,7 @@ services:
         aliases:
           - postgresql
     volumes:
-      - harbor_db_data:/var/lib/postgresql/data:z
+      - harbor_db_data:/var/lib/postgresql/data
       - ./common/config/db/env:/etc/harbor/env:z
     env_file:
       - ./common/config/db/env
@@ -145,7 +145,7 @@ services:
         aliases:
           - redis
     volumes:
-      - harbor_redis_data:/var/lib/redis:z
+      - harbor_redis_data:/var/lib/redis
     command: >
       redis-server
       --maxmemory 128mb
@@ -180,7 +180,7 @@ services:
         aliases:
           - registry
     volumes:
-      - harbor_registry_data:/storage:z
+      - harbor_registry_data:/storage
       - ./common/config/registry/:/etc/registry/:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
     depends_on:
@@ -207,7 +207,7 @@ services:
         aliases:
           - registryctl
     volumes:
-      - harbor_registry_data:/storage:z
+      - harbor_registry_data:/storage
       - ./common/config/registry/:/etc/registry/:z
       - ./common/config/registryctl/config.yml:/etc/registryctl/config.yml:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
@@ -242,7 +242,7 @@ services:
       - ./common/config/core/app.conf:/etc/core/app.conf:z
       - ./common/config/core/env:/etc/core/env:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
-      - harbor_job_logs:/var/log/jobs:z
+      - harbor_job_logs:/var/log/jobs
     env_file:
       - ./common/config/core/env
     environment:
@@ -380,7 +380,7 @@ services:
         aliases:
           - jobservice
     volumes:
-      - harbor_job_logs:/var/log/jobs:z
+      - harbor_job_logs:/var/log/jobs
       - ./common/config/jobservice/config.yml:/etc/jobservice/config.yml:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
     env_file:
@@ -409,7 +409,7 @@ services:
         aliases:
           - trivy-adapter
     volumes:
-      - harbor_trivy_data:/home/scanner/.cache/trivy:z
+      - harbor_trivy_data:/home/scanner/.cache/trivy
     env_file:
       - ./common/config/trivy-adapter/env
     environment:
