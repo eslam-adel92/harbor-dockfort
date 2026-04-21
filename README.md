@@ -308,8 +308,8 @@ sudo ./install.sh --with-trivy
 docker compose down
 
 # Copy generated config to our deployment directory
-mkdir -p /opt/harbor-registry/common
-cp -r /opt/harbor-registry/harbor/common/config /opt/harbor-registry/common/config
+rm -rf /opt/harbor-registry/common
+cp -r /opt/harbor-registry/harbor/common /opt/harbor-registry/
 ```
 
 ### 4.4 Deploy with Our Compose File
