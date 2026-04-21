@@ -62,6 +62,8 @@ volumes:
     driver: local
   harbor_trivy_data:
     driver: local
+  harbor_trivy_reports:
+    driver: local
 
 # ---------------------------------------------------------------------------
 # Services
@@ -411,6 +413,7 @@ services:
           - trivy-adapter
     volumes:
       - harbor_trivy_data:/home/scanner/.cache/trivy
+      - harbor_trivy_reports:/home/scanner/.cache/reports
     env_file:
       - ./common/config/trivy-adapter/env
     environment:
