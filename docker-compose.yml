@@ -76,7 +76,9 @@ services:
     container_name: harbor-log
     restart: always
     networks:
-      - harbor_internal
+      harbor_internal:
+        aliases:
+          - log
     volumes:
       - /var/log/harbor/:/var/log/docker/:z
       - ./common/config/log/logrotate.conf:/etc/logrotate.d/logrotate.conf
@@ -102,7 +104,9 @@ services:
     container_name: harbor-db
     restart: always
     networks:
-      - harbor_internal
+      harbor_internal:
+        aliases:
+          - postgresql
     volumes:
       - harbor_db_data:/var/lib/postgresql/data:z
       - ./common/config/db/env:/etc/harbor/env:z
@@ -137,7 +141,9 @@ services:
     container_name: harbor-redis
     restart: always
     networks:
-      - harbor_internal
+      harbor_internal:
+        aliases:
+          - redis
     volumes:
       - harbor_redis_data:/var/lib/redis:z
     command: >
@@ -170,7 +176,9 @@ services:
     container_name: harbor-registry
     restart: always
     networks:
-      - harbor_internal
+      harbor_internal:
+        aliases:
+          - registry
     volumes:
       - harbor_registry_data:/storage:z
       - ./common/config/registry/:/etc/registry/:z
@@ -195,7 +203,9 @@ services:
     container_name: harbor-registryctl
     restart: always
     networks:
-      - harbor_internal
+      harbor_internal:
+        aliases:
+          - registryctl
     volumes:
       - harbor_registry_data:/storage:z
       - ./common/config/registry/:/etc/registry/:z
@@ -224,8 +234,10 @@ services:
     container_name: harbor-core
     restart: always
     networks:
-      - harbor_internal
-      - webproxy
+      harbor_internal:
+        aliases:
+          - core
+      webproxy:
     volumes:
       - ./common/config/core/app.conf:/etc/core/app.conf:z
       - ./common/config/core/env:/etc/core/env:z
@@ -318,8 +330,10 @@ services:
     container_name: harbor-portal
     restart: always
     networks:
-      - harbor_internal
-      - webproxy
+      harbor_internal:
+        aliases:
+          - portal
+      webproxy:
     volumes:
       - ./common/config/portal/nginx.conf:/etc/nginx/nginx.conf:z
     depends_on:
@@ -362,7 +376,9 @@ services:
     container_name: harbor-jobservice
     restart: always
     networks:
-      - harbor_internal
+      harbor_internal:
+        aliases:
+          - jobservice
     volumes:
       - harbor_job_logs:/var/log/jobs:z
       - ./common/config/jobservice/config.yml:/etc/jobservice/config.yml:z
@@ -389,7 +405,9 @@ services:
     container_name: trivy-adapter
     restart: always
     networks:
-      - harbor_internal
+      harbor_internal:
+        aliases:
+          - trivy-adapter
     volumes:
       - harbor_trivy_data:/home/scanner/.cache/trivy:z
     env_file:
