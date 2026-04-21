@@ -361,8 +361,12 @@ services:
       - "traefik.http.routers.harbor-portal.service=harbor-portal-svc"
       - "traefik.http.routers.harbor-portal.priority=10"
       # WAF is active for the HTML UI; ModSecurity handles XSS/SQLi detection.
-      - "traefik.http.routers.harbor-portal.middlewares=registry-headers@docker"
+      - "traefik.http.routers.harbor-portal.middlewares=portal-headers@docker"
       - "traefik.http.services.harbor-portal-svc.loadbalancer.server.port=8080"
+      
+      # ── Middleware: Portal Security Headers ──────────────────────────────
+      - "traefik.http.middlewares.portal-headers.headers.customresponseheaders.X-Frame-Options=DENY"
+      - "traefik.http.middlewares.portal-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
 
       # ── HTTP → HTTPS redirect ────────────────────────────────────────────
       - "traefik.http.routers.harbor-portal-http.rule=Host(`${HARBOR_HOSTNAME}`)"
