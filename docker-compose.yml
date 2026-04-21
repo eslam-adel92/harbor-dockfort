@@ -439,28 +439,3 @@ services:
         reservations:
           cpus: "0.10"
           memory: 512M
-
-  # -------------------------------------------------------------------------
-  # harbor-exporter  (Prometheus metrics endpoint — optional but recommended)
-  # Scrape at /metrics on port 9090 (internal). Wire to your monitoring stack.
-  # -------------------------------------------------------------------------
-  harbor-exporter:
-    image: goharbor/harbor-exporter:v2.14.0
-    container_name: harbor-exporter
-    restart: always
-    networks:
-      - harbor_internal
-    environment:
-      - HARBOR_SERVICE_SCHEME=http
-      - HARBOR_SERVICE_HOST=harbor-core
-      - HARBOR_SERVICE_PORT=8080
-    depends_on:
-      - harbor-core
-    deploy:
-      resources:
-        limits:
-          cpus: "0.10"
-          memory: 64M
-        reservations:
-          cpus: "0.02"
-          memory: 32M
