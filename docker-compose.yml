@@ -275,7 +275,7 @@ services:
       # are matched first and routed to harbor-core, not harbor-portal.
       - "traefik.http.routers.harbor-api.rule=Host(`${HARBOR_HOSTNAME}`) && (PathPrefix(`/v2/`) || PathPrefix(`/service/`) || PathPrefix(`/api/`) || PathPrefix(`/c/`))"
       - "traefik.http.routers.harbor-api.entrypoints=websecure"
-      - "traefik.http.routers.harbor-api.tls.certresolver=le"
+      - "traefik.http.routers.harbor-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
       - "traefik.http.routers.harbor-api.service=harbor-core-svc"
       - "traefik.http.routers.harbor-api.priority=11"
       # Apply headers + rate-limit middleware; WAF (ModSecurity) is active here.
@@ -290,7 +290,7 @@ services:
       # WAF middleware chain; TLS + rate limiting still apply.
       - "traefik.http.routers.harbor-blobs.rule=Host(`${HARBOR_HOSTNAME}`) && PathPrefix(`/v2/`) && (Method(`POST`,`PUT`,`PATCH`) || PathRegexp(`^/v2/.+/(blobs|manifests)/`))"
       - "traefik.http.routers.harbor-blobs.entrypoints=websecure"
-      - "traefik.http.routers.harbor-blobs.tls.certresolver=le"
+      - "traefik.http.routers.harbor-blobs.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
       - "traefik.http.routers.harbor-blobs.service=harbor-core-svc"
       - "traefik.http.routers.harbor-blobs.priority=20"
       # Only rate limiting + headers — NO WAF, no body inspection.
@@ -342,7 +342,7 @@ services:
       # so /v2/ and /service/ are never accidentally sent to the portal Nginx.
       - "traefik.http.routers.harbor-portal.rule=Host(`${HARBOR_HOSTNAME}`)"
       - "traefik.http.routers.harbor-portal.entrypoints=websecure"
-      - "traefik.http.routers.harbor-portal.tls.certresolver=le"
+      - "traefik.http.routers.harbor-portal.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
       - "traefik.http.routers.harbor-portal.service=harbor-portal-svc"
       - "traefik.http.routers.harbor-portal.priority=10"
       # WAF is active for the HTML UI; ModSecurity handles XSS/SQLi detection.

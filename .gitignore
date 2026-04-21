@@ -4,6 +4,9 @@
 # Harbor generated configs (from install script)
 config/
 
+common/
+harbor/
+
 # Backup artifacts
 *.sql.gz
 *.tar.gz

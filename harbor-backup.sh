@@ -144,8 +144,8 @@ if [[ "${DRY_RUN}" == "false" ]]; then
     cp "${HARBOR_COMPOSE_DIR}/.env" "${BACKUP_DIR}/config/env.backup" 2>/dev/null || true
     
     # Harbor config directory (contains all service configs)
-    if [[ -d "${HARBOR_COMPOSE_DIR}/config" ]]; then
-        cp -r "${HARBOR_COMPOSE_DIR}/config" "${BACKUP_DIR}/config/harbor-config" 2>/dev/null || true
+    if [[ -d "${HARBOR_COMPOSE_DIR}/common/config" ]]; then
+        cp -r "${HARBOR_COMPOSE_DIR}/common/config" "${BACKUP_DIR}/config/harbor-config" 2>/dev/null || true
     fi
     
     log "Configuration backup complete"

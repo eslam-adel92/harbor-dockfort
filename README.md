@@ -308,7 +308,8 @@ sudo ./install.sh --with-trivy
 docker compose down
 
 # Copy generated config to our deployment directory
-cp -r /opt/harbor-registry/harbor/common/config /opt/harbor-registry/config
+mkdir -p /opt/harbor-registry/common
+cp -r /opt/harbor-registry/harbor/common/config /opt/harbor-registry/common/config
 ```
 
 ### 4.4 Deploy with Our Compose File
@@ -721,7 +722,8 @@ zcat /opt/harbor-restore/harbor-db-*.sql.gz | docker exec -i harbor-db psql -U p
 tar -xzf /opt/harbor-restore/harbor-registry-data-*.tar.gz -C /opt/harbor-registry/
 
 # Restore configuration
-cp -r /opt/harbor-restore/config/harbor-config/* /opt/harbor-registry/config/
+mkdir -p /opt/harbor-registry/common
+cp -r /opt/harbor-restore/config/harbor-config/* /opt/harbor-registry/common/config/
 cp /opt/harbor-restore/config/env.backup /opt/harbor-registry/.env
 cp /opt/harbor-restore/config/docker-compose.yml /opt/harbor-registry/
 
