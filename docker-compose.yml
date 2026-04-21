@@ -45,7 +45,7 @@ networks:
   # Attach Harbor services that need Traefik routing to the existing WAF network.
   # This network is created by eslam-adel92/traefik_waf_modsec_nginx — do NOT
   # redefine it with `driver` or `driver_opts`; use `external: true`.
-  traefik_waf_modsec_nginx_default:
+  webproxy:
     external: true
 
 # ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ services:
     restart: always
     networks:
       - harbor_internal
-      - traefik_waf_modsec_nginx_default
+      - webproxy
     volumes:
       - ./common/config/core/app.conf:/etc/core/app.conf:z
       - ./common/config/core/env:/etc/core/env:z
@@ -273,7 +273,7 @@ services:
       # ── Router: Harbor API / service endpoints ──────────────────────────
       # Higher priority (11) than the portal router (10) so /v2/ and /service/
       # are matched first and routed to harbor-core, not harbor-portal.
-      - "traefik.http.routers.harbor-api.rule=Host(`registry.yourdomain.com`) && (PathPrefix(`/v2/`) || PathPrefix(`/service/`) || PathPrefix(`/api/`) || PathPrefix(`/c/`))"
+      - "traefik.http.routers.harbor-api.rule=Host(`${HARBOR_HOSTNAME}`) && (PathPrefix(`/v2/`) || PathPrefix(`/service/`) || PathPrefix(`/api/`) || PathPrefix(`/c/`))"
       - "traefik.http.routers.harbor-api.entrypoints=websecure"
       - "traefik.http.routers.harbor-api.tls.certresolver=le"
       - "traefik.http.routers.harbor-api.service=harbor-core-svc"
@@ -288,7 +288,7 @@ services:
       # data and WILL block legitimate pushes with 403/413 errors.
       # This router has the highest priority (20) and intentionally omits the
       # WAF middleware chain; TLS + rate limiting still apply.
-      - "traefik.http.routers.harbor-blobs.rule=Host(`registry.yourdomain.com`) && PathPrefix(`/v2/`) && (Method(`POST`,`PUT`,`PATCH`) || PathRegexp(`^/v2/.+/(blobs|manifests)/`))"
+      - "traefik.http.routers.harbor-blobs.rule=Host(`${HARBOR_HOSTNAME}`) && PathPrefix(`/v2/`) && (Method(`POST`,`PUT`,`PATCH`) || PathRegexp(`^/v2/.+/(blobs|manifests)/`))"
       - "traefik.http.routers.harbor-blobs.entrypoints=websecure"
       - "traefik.http.routers.harbor-blobs.tls.certresolver=le"
       - "traefik.http.routers.harbor-blobs.service=harbor-core-svc"
@@ -305,8 +305,6 @@ services:
       - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.Content-Encoding="
       - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.X-Frame-Options=DENY"
       - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
-      # Empty value = remove header. Strips gzip encoding from upstream.
-      - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.Content-Encoding="
 
       # ── Middleware: Rate limiting ─────────────────────────────────────────
       # 50 req/s average, burst of 100 — generous for CI/CD push workflows
@@ -323,7 +321,7 @@ services:
     restart: always
     networks:
       - harbor_internal
-      - traefik_waf_modsec_nginx_default
+      - webproxy
     volumes:
       - ./common/config/portal/nginx.conf:/etc/nginx/nginx.conf:z
     depends_on:
@@ -342,7 +340,7 @@ services:
       # ── Router: Web UI (catch-all at priority 10) ────────────────────────
       # Lower priority than harbor-api (11) and harbor-blobs (20) routers,
       # so /v2/ and /service/ are never accidentally sent to the portal Nginx.
-      - "traefik.http.routers.harbor-portal.rule=Host(`registry.yourdomain.com`)"
+      - "traefik.http.routers.harbor-portal.rule=Host(`${HARBOR_HOSTNAME}`)"
       - "traefik.http.routers.harbor-portal.entrypoints=websecure"
       - "traefik.http.routers.harbor-portal.tls.certresolver=le"
       - "traefik.http.routers.harbor-portal.service=harbor-portal-svc"
@@ -352,7 +350,7 @@ services:
       - "traefik.http.services.harbor-portal-svc.loadbalancer.server.port=8080"
 
       # ── HTTP → HTTPS redirect ────────────────────────────────────────────
-      - "traefik.http.routers.harbor-portal-http.rule=Host(`registry.yourdomain.com`)"
+      - "traefik.http.routers.harbor-portal-http.rule=Host(`${HARBOR_HOSTNAME}`)"
       - "traefik.http.routers.harbor-portal-http.entrypoints=web"
       - "traefik.http.routers.harbor-portal-http.middlewares=redirect-to-https@docker"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
