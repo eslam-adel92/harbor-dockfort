@@ -248,7 +248,7 @@ services:
       - ./harbor-data/secret/core/private_key.pem:/etc/core/private_key.pem:z
       - ./harbor-data/secret/keys/secretkey:/etc/core/key:z
       - ./harbor-data/ca_download/:/etc/core/ca/:z
-      - ./harbor-data/:/data/:z
+      # - ./harbor-data/:/data/:z
       - ./common/config/core/certificates/:/etc/core/certificates/:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
       - harbor_job_logs:/var/log/jobs
