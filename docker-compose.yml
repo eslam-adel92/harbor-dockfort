@@ -151,6 +151,7 @@ services:
       --maxmemory 128mb
       --maxmemory-policy allkeys-lru
       --save ""
+      --protected-mode no
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s

@@ -309,7 +309,7 @@ docker compose down
 
 # Copy generated config to our deployment directory
 sudo rm -rf /opt/harbor-registry/common
-sudo cp -r /opt/harbor-registry/harbor/common /opt/harbor-registry/
+sudo cp -ra /opt/harbor-registry/harbor/common /opt/harbor-registry/
 sudo chown -R $USER:$USER /opt/harbor-registry/common
 ```
 
@@ -322,7 +322,7 @@ cd /opt/harbor-registry
 docker compose pull
 
 # Start the stack
-docker compose up -d
+sudo docker compose up -d
 
 # Monitor startup
 docker compose logs -f --tail=50
