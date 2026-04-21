@@ -185,6 +185,7 @@ services:
     volumes:
       - harbor_registry_data:/storage
       - ./common/config/registry/:/etc/registry/:z
+      - /mnt/harbor-storage/harbor-data/secret/registry/root.crt:/etc/registry/root.crt:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
     depends_on:
       - harbor-log
@@ -244,7 +245,10 @@ services:
     volumes:
       - ./common/config/core/app.conf:/etc/core/app.conf:z
       - ./common/config/core/env:/etc/core/env:z
-      - ./common/config/core/private_key.pem:/etc/core/private_key.pem:z
+      - /mnt/harbor-storage/harbor-data/secret/core/private_key.pem:/etc/core/private_key.pem:z
+      - /mnt/harbor-storage/harbor-data/secret/keys/secretkey:/etc/core/key:z
+      - /mnt/harbor-storage/harbor-data/ca_download/:/etc/core/ca/:z
+      - /mnt/harbor-storage/harbor-data/:/data/:z
       - ./common/config/core/certificates/:/etc/core/certificates/:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
       - harbor_job_logs:/var/log/jobs
@@ -272,18 +276,8 @@ services:
           memory: 256M
     labels:
       # =====================================================================
-      # Traefik Router Configuration
-      # =====================================================================
-      # Three separate routers handle different traffic patterns:
-      #
-      # 1. harbor-portal  → UI traffic (HTML/JS/CSS)
-      # 2. harbor-api     → Registry API (/v2/, /service/) with WAF + rate limit
-      # 3. harbor-blobs   → Binary blob/manifest uploads WITHOUT WAF
-      #
-      # The blob router is critical: ModSecurity would reject binary layer
-      # uploads as "suspicious payloads," breaking docker push entirely.
-      # =====================================================================
       - "traefik.enable=true"
+      - "traefik.docker.network=webproxy"
 
       # ── Router: Harbor API / service endpoints ──────────────────────────
       # Higher priority (11) than the portal router (10) so /v2/ and /service/
@@ -317,7 +311,6 @@ services:
       # Content-Encoding cleared: OCI spec requires registries to serve blobs
       # without transfer encoding — stripping gzip prevents double-encoding.
       - "traefik.http.middlewares.registry-headers.headers.customrequestheaders.X-Content-Type-Options=nosniff"
-      - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.Content-Encoding="
       - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.X-Frame-Options=DENY"
       - "traefik.http.middlewares.registry-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
 
@@ -353,6 +346,7 @@ services:
           memory: 64M
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=webproxy"
 
       # ── Router: Web UI (catch-all at priority 10) ────────────────────────
       # Lower priority than harbor-api (11) and harbor-blobs (20) routers,
@@ -420,6 +414,7 @@ services:
     volumes:
       - harbor_trivy_data:/home/scanner/.cache/trivy
       - harbor_trivy_reports:/home/scanner/.cache/reports
+      - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
     env_file:
       - ./common/config/trivy-adapter/env
     environment:
