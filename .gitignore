@@ -6,7 +6,7 @@ config/
 
 common/
 harbor/
-
+harbor-data/*
 # Backup artifacts
 *.sql.gz
 *.tar.gz
