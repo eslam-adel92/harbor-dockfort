@@ -209,10 +209,10 @@ services:
         aliases:
           - registry
     volumes:
-      - /mnt/harbor-storage/harbor-data//registry:/storage:z
+      - /mnt/harbor-storage/harbor-data/registry:/storage:z
       - ./common/config/registry/:/etc/registry/:z
       - type: bind
-        source: /mnt/harbor-storage/harbor-data//secret/registry/root.crt
+        source: /mnt/harbor-storage/harbor-data/secret/registry/root.crt
         target: /etc/registry/root.crt
       - type: bind
         source: ./common/config/shared/trust-certificates
@@ -248,7 +248,7 @@ services:
         aliases:
           - registryctl
     volumes:
-      - /mnt/harbor-storage/harbor-data//registry:/storage:z
+      - /mnt/harbor-storage/harbor-data/registry:/storage:z
       - ./common/config/registry/:/etc/registry/:z
       - ./common/config/registryctl/config.yml:/etc/registryctl/config.yml:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
@@ -285,17 +285,17 @@ services:
           - core
       webproxy:
     volumes:
-      - /mnt/harbor-storage/harbor-data//ca_download/:/etc/core/ca/:z
-      - /mnt/harbor-storage/harbor-data//:/data/:z
+      - /mnt/harbor-storage/harbor-data/ca_download/:/etc/core/ca/:z
+      - /mnt/harbor-storage/harbor-data/:/data/:z
       - ./common/config/core/certificates/:/etc/core/certificates/:z
       - type: bind
         source: ./common/config/core/app.conf
         target: /etc/core/app.conf
       - type: bind
-        source: /mnt/harbor-storage/harbor-data//secret/core/private_key.pem
+        source: /mnt/harbor-storage/harbor-data/secret/core/private_key.pem
         target: /etc/core/private_key.pem
       - type: bind
-        source: /mnt/harbor-storage/harbor-data//secret/keys/secretkey
+        source: /mnt/harbor-storage/harbor-data/secret/keys/secretkey
         target: /etc/core/key
       - type: bind
         source: ./common/config/shared/trust-certificates
