@@ -209,7 +209,7 @@ services:
         aliases:
           - registry
     volumes:
-      - harbor_registry_data:/storage
+      - /mnt/harbor-storage/harbor-data//registry:/storage:z
       - ./common/config/registry/:/etc/registry/:z
       - type: bind
         source: /mnt/harbor-storage/harbor-data//secret/registry/root.crt
@@ -248,7 +248,7 @@ services:
         aliases:
           - registryctl
     volumes:
-      - harbor_registry_data:/storage
+      - /mnt/harbor-storage/harbor-data//registry:/storage:z
       - ./common/config/registry/:/etc/registry/:z
       - ./common/config/registryctl/config.yml:/etc/registryctl/config.yml:z
       - ./common/config/shared/trust-certificates:/harbor_cust_cert:z
